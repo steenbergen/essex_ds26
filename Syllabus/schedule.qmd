@@ -1,0 +1,118 @@
+---
+title: "Schedule Update Essex Summer School 2J"
+author: "Marco Steenbergen"
+format: pdf
+editor: visual
+---
+
+We will cover the same topics–but with a shift to Python for deep learning. I have added LLMs as an extra topic for the last day. On day 2, I have added some notes on panel and multilevel data structures. Each day, we will work through a worked example and will then leave time for individual exercises. In week 1, these will take place in R. In week 2, we switch to Python and we shall use Google CoLab.
+
+Note that the three main content pillars of the course are tree-based algorithms, deep learning, and unsupervised learning. These are the most widely used approaches at this time. Tree-based learners are great for structured (read tabular) data. Deep learning shines with unstructured data such as images and text. Finally, unsupervised learning is useful for pattern recognition when there is not an obvious outcome we want to predict.
+
+# Module I: Machine Learning Basics
+
+## Day 1
+
+### Topics
+
+\(A\) What is machine learning (ML) and why is it useful? (B) ML workflows. (C) Re-sampling techniques for validation; and (D) over-fits and regularization.
+
+### Description
+
+The day starts with a discussion of the logic of ML and how it differs from normal quantitative methods. We shall quickly discover the shift in focus to prediction. We discuss useful use cases for the social sciences and the risks that ML entails. We then build our first workflow for a regression task. Next, we discuss validation of trained models and the role of various re-sampling techniques. We then turn to remedies for on particular ML risk: over-fitting the training data. We introduce regularization as our solution and build a new workflow using the lasso, Thikonov, and elastic nets. Here we shall encounter the concept of tuning parameters in earnest and will discuss the use of tuning grids.
+
+## Day 2
+
+### Topics
+
+\(A\) Special considerations for time series, panel and hierarchical data structures. (B) Classification tasks and classifier performance. (C) The k-nearest neighbor algorithm. (D) The naive Bayes algorithm. (E) Discriminant analysis.
+
+### Description
+
+We begin the day by discussing re-sampling and training for more complex data structures than we considered on Day 1, including time series, panel data, and hierarchical data structures. Compared to Day 1, we also shift our attention away from regression to classification tasks. After discussing performance assessment for classifiers, we discuss three classical algorithms that continue to find good use in data science: k-nearest neighbors, naive Bayes, and discriminant analysis.
+
+# Module II: Tree-Based Learners
+
+## Day 3
+
+### Topics
+
+\(A\) Classical tree-based learners (C5.0, CART, and model trees) and their disadvantages. (B) Limitations of classical algorithms. (C) Building learner ensembles, with a special emphasis on bagging. (D) Random forests. (E) Application to missing data imputation.
+
+### Description
+
+On day 2, we introduced the idea of classification boundaries that were lines or curves. Today, we look at boundaries that are axis-parallel. Generic algorithms that follow this pattern are called tree-based learners and they are among the most widely used ML algorithms. While we start with traditional tree-based algorithms, we will not stay all that long with them because they have serious weaknesses. Ensemble learners fix those issues. Today, we focus especially on one ensemble approach: bootstrap aggregation or bagging, where many trees are fitted in bootstrap samples and then aggregated for prediction. Random forests may be the best-known bagging algorithm. One of its applications is missing data imputation, especially where missingness is severe.
+
+## Day 4
+
+### Topics
+
+\(A\) BART. (B) Causal inference with machine learning.
+
+### Description
+
+Bayesian Additive Regression Trees or BART are a wonderful ensemble learner because they explicitly insert uncertainty into ML. Today, we discuss the logic of BART. We also discuss Bayesian tuning methods. In the second part, we move to causal inference with ML. We discuss double ML for causal inference, as well as S-, T- and X-learners for heterogeneous treatment effects.
+
+## Day 5
+
+### Topics
+
+\(A\) Boosting-ensemble learners. (B) ADA Boost. (C) Extreme gradient boosting. (D) lighGBM and catboost. (E) Interpretable machine learning.
+
+### Description
+
+Boosting is another ensemble algorithm, this one trying to learn from past mistakes. The simplest algorithm is ADA Boost, but that was somewhat limited. Modern boosting algorithms such as XGBoost and, more recently, lightGBM and catboost, are very powerful algorithms capable of very strong predictive performance. Since ensemble algorithms are complex, we also discuss methods for interpretable machine learning.
+
+# Module III: Deep Learning
+
+## Day 6
+
+### Topics
+
+\(A\) Stacking. (B) Python basics. (C) Using Python for data science.
+
+### Description
+
+After a hopefully relaxing weekend, we start the day with a final ensemble learner—stacking. Whereas bagging and boosting aggregate predictions among identical tree-based algorithms, stacking allows us to bring together data from many different algorithms. Once we have discussed stacking, it is time to prepare for deep learning. We switch to Python instead of R. After discussing simple Python basics, we move to data analysis in Python. We will also show how to run a machine learning workflow in Python.
+
+## Day 7
+
+### Topics
+
+\(A\) Artificial neural networks. (B) Feedforward neural networks, dropout, weight decay, stochastic gradient descent, and back-propagation.
+
+### Description
+
+Since at least the 1940s—and probably much longer—scholars have drawn inspiration from the (human) brain for modeling. Artificial neural networks are the product of those endeavors and they are the backbone of much of what we now take for granted, such as large language models (LLMs). Feedforward neural networks (FFNs) are the most basic networks and continue to play an important role in their own right or as the back-end to other neural networks. Today, we discuss their architecture, activation functions, their training, and their programming using PyTorch.
+
+## Day 8
+
+### Topics
+
+\(A\) Recurrent neural networks. (B) Convolutional neural networks.
+
+### Description
+
+FFNs are not the only canonical deep learning architectures. Others are recurrent neural and convolutional neural networks, as well as transformers, which we discuss on Day 10. Recurrent neural networks (RNNs) are useful for time series, while convolutional neural networks (CNNs) are widely used in vision models. Today, we introduce these models and show simple applications, while also pointing to more advanced literature.
+
+# Module IV: Unsupervised ML
+
+## Day 9
+
+### Topics
+
+\(A\) Principal component analysis. (B) Hierarchical cluster analysis. (C) k-Means clustering.
+
+### Description
+
+Unsupervised learning can be divided into two broad strands. The first focuses on finding groups of variables and includes methods such as principal component analysis. The second is concerned with finding groups of cases and is known as cluster analysis. Today, we focus on two classical clustering approaches: hierarchical and k-means clustering. We briefly add a discussion of k-mode clustering as well.
+
+## Day 10
+
+### Topics
+
+\(A\) DBSCAN. (B) Gaussian finite mixture models. (C) LLMs for natural language processing.
+
+### Description
+
+The first half of this final class is dedicated to more modern clustering algorithms such as DBSCAN and Gaussian finite mixture models. The former can handle complex data patterns better than hierarchical and k-means clustering. The latter is interesting because it introduces uncertainty into how cases are clustered. The second half of the class takes us back to deep learning. We shall discuss transformer architectures and how they became the foundation of large language models and modern AI. We shall focus on encoders and illustrate how the BERT-algorithm can be used in social scientific research.
