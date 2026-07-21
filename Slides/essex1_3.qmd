@@ -21,6 +21,9 @@ editor_options:
 
 ## R Packages for this Lecture
 
+Next to the packages from the last time, we need:
+
+- `future` and `doFuture` for parallel processing during tuning (speeds things up).
 - `glmnet` for regularized linear and logistic regression.
 
 # What Is Regularization? {background-color="#40666e"}
@@ -164,6 +167,16 @@ plot_glmnet(lasso_fit, lwd = 3, col = c("#21918c","#fde725"),
 
 - Here $\gamma$ is another hyper-parameters.
 
+## Important
+
+- A valid use of regularization requires that features are put on the same scale.
+
+- `tidymodels` offers several ways to accomplish this:
+
+  - `step_normalize()` standardizes the features.
+
+  - `step_range()` scales the minimum and maximum to 0 and 1, respectively.
+
 # How to Select and Validate Hyper-Parameters {background-color="#40666e"}
 
 ## A Wealth of Possibilities
@@ -223,6 +236,39 @@ plot_glmnet(lasso_fit, lwd = 3, col = c("#21918c","#fde725"),
   - $(1 - q) \cdot n_1$ validation instances—used to assess predictive performance given $\boldsymbol{\tau}$.
 
 - We iterate over the grid and pick as $\boldsymbol{\tau}$ that set of values that maximize performance in the [**validation set**]{.alert}.
+
+## The Validation Split Cont'd
+
+::: panel-tabset
+## Data
+
+```{r}
+#| echo: true
+#| message: false
+library(mlbench)
+library(tidymodels)
+library(tidyverse)
+tidymodels_prefer()
+data("BostonHousing2")
+df_new <- BostonHousing2 |>
+  mutate(target = log10(cmedv),
+         high_tax = ifelse(tax > 600, 1, 0)) |>
+  select(tract, target, nox, tax, high_tax)
+set.seed(1292)
+housing_split <- initial_split(df_new, prop = 0.75)
+train_df <- training(housing_split)
+```
+
+## Validation
+
+```{r}
+#| echo: true
+# We set q = 0.75
+set.seed(2158)
+validation_set <- validation_split(train_df, prop = 3/4)
+validation_set
+```
+:::
 
 ## The Validation Split Cont'd
 
@@ -358,6 +404,46 @@ ggplot(dummy) +
 
 - [**Monte Carlo CV**]{.alert} selects the folds randomly each time, which may cause folds to contain overlapping instances [@xu2001Monte].
 
+## $v$-Fold Cross-Validation in `tidymodels`
+
+::: panel-tabset
+### Vanilla
+
+```{r}
+#| echo: true
+set.seed(1923)
+vanilla_folds <- vfold_cv(train_df, v = 10)
+vanilla_folds
+```
+
+### Repeated
+
+```{r}
+#| echo: true
+set.seed(1923)
+repeated_folds <- vfold_cv(train_df, v = 10, repeats = 5)
+repeated_folds
+```
+
+### LOOCV
+
+```{r}
+#| echo: true
+set.seed(1923)
+loocv_folds <- loo_cv(train_df)
+loocv_folds
+```
+
+### Monte Carlo
+
+```{r}
+#| echo: true
+set.seed(1923)
+mc_folds <- mc_cv(train_df, prop = 9/10, times = 20)
+mc_folds
+```
+:::
+
 ## Bootstrapping
 
 ::::: columns
@@ -373,5 +459,223 @@ ggplot(dummy) +
 - Non-sampled instances are used for validation.
 :::
 :::::
+
+## Bootstrapping Cont'd
+
+```{r}
+#| echo: true
+set.seed(1923)
+booted <- bootstraps(train_df, times = 100)
+booted
+```
+
+# Doing Regularization in R {background-color="#40666e"}
+
+## Data Split
+
+```{r}
+#| echo: true
+#| message: false
+library(mlbench)
+library(tidymodels)
+library(tidyverse)
+tidymodels_prefer()
+data("BostonHousing2")
+df_new <- BostonHousing2 |>
+  mutate(target = log10(cmedv),
+         high_tax = ifelse(tax > 600, 1, 0)) |>
+  select(tract, target, nox, tax, high_tax)
+set.seed(1292)
+housing_split <- initial_split(df_new, prop = 0.75)
+train_df <- training(housing_split)
+test_df <- testing(housing_split)
+```
+
+## Workflow
+
+::: panel-tabset
+## Recipe
+
+```{r}
+#| echo: true
+# The order matters for this recipe
+housing_recipe <- recipe(target ~ ., data = train_df) |>
+  update_role(tract, new_role = "id") |>
+  step_BoxCox(nox, tax) |>
+  step_range(all_numeric_predictors())
+```
+
+## Model
+
+```{r}
+#| echo: true
+# Penalty = lambda; mixture = gamma
+housing_model <- linear_reg(
+  penalty = tune(),
+  mixture = tune()
+) |>
+  set_mode("regression") |>
+  set_engine("glmnet")
+
+```
+
+## Workflow
+
+```{r}
+#| echo: true
+housing_wf <- workflow() |>
+  add_recipe(housing_recipe) |>
+  add_model(housing_model)
+```
+:::
+
+## Tuning the Model
+
+::: panel-tabset
+## Grid
+
+```{r}
+#| echo: true
+# Extract hyperparameter set and update space bounds if needed
+glmnet_param <- extract_parameter_set_dials(housing_model)
+
+# Create a space-filling design with 50 configurations
+# For serious tuning, you'd probably increase this
+set.seed(1561)
+elastic_grid <- grid_space_filling(
+  glmnet_param, 
+  size = 50,
+  type = "latin_hypercube"
+)
+
+print(elastic_grid, n = 6)
+```
+
+## CV
+
+```{r}
+#| echo: true
+# 10-fold CV with 5 repeats
+set.seed(1923)
+elastic_cv <- vfold_cv(train_df, v = 10, repeats = 5)
+```
+
+## Iterating
+
+```{r}
+#| echo: true
+library(future)
+library(doFuture)
+# Setting evaluation metrics for validation
+elastic_metrics <- metric_set(rsq)
+
+# Setup modern, cross-platform parallel execution using all available cores
+plan(multisession, workers = parallelly::availableCores())
+
+# Register backend for foreach compatibility in tidymodels
+registerDoFuture()
+
+set.seed(1561)
+elastic_tune <- housing_wf %>%
+  tune_grid(
+    resamples = elastic_cv,
+    grid = elastic_grid,
+    metrics = elastic_metrics,
+    control = control_grid(save_pred = TRUE, verbose = FALSE)
+  )
+
+# Explicitly shut down background workers
+plan(sequential)
+```
+
+## Plot 1
+
+```{r}
+#| echo: true
+#| eval: false
+# Plotting syntax: Mean R2 across folds by constellation
+autoplot(elastic_tune) +
+  theme_light() +
+  labs(
+    title = "Hyperparameter Tuning for Elastic Net",
+    subtitle = "Space-Filling (Latin Hypercube) Design Results"
+  )
+```
+
+## Plot 2
+
+```{r}
+autoplot(elastic_tune) +
+  theme_light() +
+  labs(
+    title = "Hyperparameter Tuning for Elastic Net",
+    subtitle = "Space-Filling (Latin Hypercube) Design Results"
+  )
+```
+
+## Best
+
+```{r}
+#| echo: true
+# Extract best hyperparameter set
+elastic_best <- select_best(elastic_tune, metric = "rsq") # Specify your target metric
+elastic_best
+```
+:::
+
+## Final Fit
+
+::: panel-tabset
+## Syntax
+
+```{r}
+#| echo: true
+housing_updated <- finalize_model(housing_model,
+                                  elastic_best)
+workflow_new <- housing_wf |>
+  update_model(housing_updated)
+new_fit <- workflow_new |>
+  fit(data = train_df)
+tidy_housing <- new_fit |>
+  extract_fit_parsnip() |>
+  tidy()
+```
+
+## Results
+
+```{r}
+#| echo: true
+tidy_housing
+```
+:::
+
+## Performance
+
+::: panel-tabset
+## Syntax
+
+```{r}
+#| echo: true
+elastic_testfit <- new_fit |>
+  predict(test_df) |>
+  bind_cols(test_df) |>
+  metrics(truth = target, estimate = .pred)
+```
+
+## Results
+
+```{r}
+#| echo: true
+elastic_testfit
+```
+:::
+
+## Exercise
+
+::: callout-tip
+## Your Turn
+
+Repeat the flow for a model containing all features, excepting "medv", "town", "lon", and "lat".
+:::
 
 ## References
