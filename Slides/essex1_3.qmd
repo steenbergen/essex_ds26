@@ -575,6 +575,7 @@ plan(multisession, workers = parallelly::availableCores())
 # Register backend for foreach compatibility in tidymodels
 registerDoFuture()
 
+set.seed(1561)
 elastic_tune <- housing_wf |>
   tune_grid(
     resamples = elastic_cv,
