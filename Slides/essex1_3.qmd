@@ -54,7 +54,7 @@ Next to the packages from the last time, we need:
 
 - Using Lagrange multipliers, the lasso loss is $L_{\text{lasso}} = L_2 + \lambda \left( \sum_{j=1}^P \lvert \beta_j \rvert - t \right)$.
 
-- Retaining only the terms in $\omega$, the optimization problem is
+- Retaining only the terms in $\beta$, the optimization problem is
 
   $$\min_{\alpha, \boldsymbol{\beta}} \sum_{i=1}^{n_1} \left( \alpha + \boldsymbol{x}_i^\top \boldsymbol{\beta} - y_i \right)^2 + \lambda \lvert \boldsymbol{\beta} \rvert$$
 
@@ -151,11 +151,11 @@ plot_glmnet(lasso_fit, lwd = 3, col = c("#21918c","#fde725"),
 
 - For $\gamma \in [0,1]$, define the penalty
 
-  $$P(\gamma) = \sum_{j=1}^P \left[ \frac{1}{2} (1 - \gamma) \omega_j^2 + \gamma \lvert \omega_j \rvert \right]$$
+  $$P(\gamma) = \sum_{j=1}^P \left[ \frac{1}{2} (1 - \gamma) \beta_j^2 + \gamma \lvert \beta_j \rvert \right]$$
 
 - Then
 
-  $$\min_{\boldsymbol{\omega}} \sum_{i=1}^{n_1} \left( \beta + \boldsymbol{x}_i^\top \boldsymbol{\omega} - y_i \right)^2 + \lambda P(\gamma)$$
+  $$\min_{\boldsymbol{\beta}} \sum_{i=1}^{n_1} \left( \alpha + \boldsymbol{x}_i^\top \boldsymbol{\beta} - y_i \right)^2 + \lambda P(\gamma)$$
 
 ## Elastic Nets Cont'd
 

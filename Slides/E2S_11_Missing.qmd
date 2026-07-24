@@ -1,0 +1,314 @@
+---
+title: RANDOM FOREST IMPUTATION
+author:
+  - name: Marco R. Steenbergen
+    orcid: 0000-0002-5709-5165
+    email: steenbergen@ipz.uzh.ch
+    affiliations: University of Zurich
+date: last-modified
+format:
+  clean-revealjs:
+    revealjs-plugins:
+      - tabset
+    pdf-separate-fragments: true
+bibliography: /Users/prior/Resources/References/master.bib
+self-contained: true
+embed-resources: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## R Packages for this Lecture
+
+Beyond packages you have installed already, please add
+
+- `mice` for missing data imputation with chained equations
+- `miceRanger` for implementing multiple imputation
+- `missForest` for single RF-based imputations
+
+# Basics of Missing Data {background-color="#40666e"}
+
+## The Bane of the Social Scientist's Existence
+
+- Missing data are a common occurrence in social science data analysis.
+
+- They are common in survey research due to **non-response**.
+
+- In archival work, they occur as well because reporting is not always complete.
+
+## Missing Data Patterns
+
+- Missing data patterns show how often and where missing data occur.
+
+- This is generally a key step for understanding missingness.
+
+## Missingness in the World Indicator Data
+
+::: panel-tabset
+## Variables
+
+```{r}
+#| echo: true
+#| eval: false
+library(naniar)
+library(rio)
+world <- import("Data/world22.xlsx")
+gg_miss_var(world, show_pct = TRUE)
+```
+
+## Plot1
+
+```{r}
+#| message: false
+library(naniar)
+library(rio)
+world <- import("data/world22.xlsx")
+gg_miss_var(world, show_pct = TRUE)
+```
+
+## Cases
+
+```{r}
+#| echo: true
+#| eval: false
+gg_miss_case(world, order_cases = TRUE)
+```
+
+## Plot2
+
+```{r}
+gg_miss_case(world, order_cases = TRUE)
+```
+:::
+
+## Missing Data Mechanisms
+
+- Missing data mechanisms describe how the missing data were generated.
+
+- Generally, three mechanisms are identified [e.g., @rubin1976Inference].
+
+  1.  [**Missing Completely at Random**]{.alert} (MCAR): Missing values arise by chance; no biases are introduced but efficiency suffers.
+  2.  [**Missingness at Random**]{.alert} (MAR): Missing values are driven by covariates that may also drive the outcome of interest; biases are introduced and efficiency suffers.
+  3.  [**Missingess Not at Random**]{.alert} (MNR): Missing values depend on the values of the outcome of interest; biases are introduced and efficiency suffers.
+
+# Traditional Approaches for Missing Data {background-color="#40666e"}
+
+## Listwise Deletion
+
+- A.k.a. complete case analysis.
+
+- We drop all cases that have any missingness on the variables of interest.
+
+- Unproblematic under MCAR, aside from efficiency loss.
+
+- Bound to induce bias under MAR and MNR.
+
+## Hot Deck Imputation
+
+- The canonical reference is @ford1983Overview.
+
+- Assuming MAR, we substitute the value of the nearest neighbor in terms of a set of covariates.
+
+- This is what we have emulated using kNN.
+
+## Parametric Approaches
+
+- EM algorithm [@dempster1977Maximum].
+
+- Bayesian imputation [@rubin1987Multiple].
+
+- MICE = Multiple Imputation with Chained Equations [@vanbuuren2018Flexible].
+
+- These work quite nicely but
+
+  - Strong assumptions are needed
+
+  - Missingness should not be too great
+
+## MICE Steps
+
+- Imputation stage:
+  - We build imputation models appropriate for the type of variable.
+  - We run these models $t$ times, each time adding noise proportional to the prediction error from the model.
+  - Observed data do not receive noise.
+- Analysis stage:
+  - We analyze each of the $t$ imputed data sets separately.
+  - We average the estimates and adjust their variance by considering within- and between-data set variation.
+
+## MICE with the World Indicators Step 1
+
+::: panel-tabset
+## Data
+
+```{r}
+#| echo: true
+world_imp <- as.data.frame(
+  world[, c("DEMINDX22", "HDI21", "EFIDX", "GINI",       # analysis model
+            "REGION", "LITERACY", "GDPPERCAP", "GDPGROWTH",
+            "POP21", "STABILITY", "GOVEFF", "RULEOFLAW")] # auxiliaries
+)
+world_imp$log_pop   <- log(world_imp$POP21)
+world_imp$log_gdppc <- log(world_imp$GDPPERCAP)
+world_imp$POP21 <- world_imp$GDPPERCAP <- NULL
+```
+
+## Imputation
+
+```{r}
+#| echo: true
+#| message: false
+library(mice)
+set.seed(2026)
+imp <- mice(world_imp,
+            m       = 20,       # 20 imputed data sets (rule of thumb: >= % missing)
+            maxit   = 10,
+            printFlag = FALSE)  # defaults: pmm for numeric, polyreg for factors
+```
+
+## Diagnostics
+
+```{r}
+#| echo: true
+#| eval: false
+## imputed (red) and observed (blue) distributions should look plausible.
+densityplot(imp, ~ DEMINDX22 + HDI21 + EFIDX + GINI)
+```
+
+## Plots
+
+```{r}
+densityplot(imp, ~ DEMINDX22 + HDI21 + EFIDX + GINI)
+```
+
+**Comment:** Observed is blue and imputed = red.
+:::
+
+## MICE with the World Indicators Step 2
+
+::: panel-tabset
+## Syntax
+
+```{r}
+#| echo: true
+fit    <- with(imp, lm(DEMINDX22 ~ HDI21 + EFIDX + GINI))
+pooled <- pool(fit)
+```
+
+## Results
+
+```{r}
+#| echo: true
+summary(pooled, conf.int = TRUE)
+```
+:::
+
+# Imputation Using Machine Learning {background-color="#40666e"}
+
+## Why Machine Learning for Missing Data?
+
+- Non-parametric models.
+
+- Capable of learning complex interplay of covariates, as well as nonlinear patterns.
+
+- Tend to work well even when the amount of missing data is large.
+
+## Theory of Missing Forests
+
+- @stekhoven2012MissForest proposed imputation using random forests.
+
+- Training proceeds as follows:
+
+  1.  Initialize by making simple baseline guesses (mean or mode) and by sorting on the amount of missingness $\Rightarrow$ start with least missing data.
+
+  2.  \(a\) Divide the data in to observed and missing entries on a variable. (b) divide all other variables into predictor rows corresponding to the observed and missing parts of the target. (3) Train the forests on the observed data. (4) Predsict and overwrite.
+
+  3.  Stop when matrix differences stabilize over iterations.
+
+## Random Forest Imputation
+
+::: panel-tabset
+## Syntax1
+
+```{r}
+#| echo: true
+#| eval: false
+library(missForest)
+library(tidyverse)
+work <- world |>
+  select(-c(COUNTRY, ISO3, REGION, SUBREGION, REGIME))
+world_rf_imp <- missForest(work)
+print(world_rf_imp$OOBerror)
+```
+
+## Results1
+
+```{r}
+#| message: false
+library(missForest)
+library(tidyverse)
+work <- world |>
+  select(-c(COUNTRY, ISO3, REGION, SUBREGION, REGIME))
+world_rf_imp <- missForest(work)
+print(world_rf_imp$OOBerror)
+```
+
+## Syntax2
+
+```{r}
+#| echo: true
+world_rf_complete <- world_rf_imp$ximp
+```
+:::
+
+## The Drawback
+
+- Only one imputed data set is returned: no capture of uncertainty.
+
+- @doove2014Recursive and @shah2014Comparison proposed multiple imputation with RFs.
+
+- Currently, the fastest implementation is `miceRanger`.
+
+## Using `miceRanger`
+
+::: panel-tabset
+## Impute
+
+```{r}
+#| echo: true
+#| message: false
+library(miceRanger)
+world_imp$REGION <- factor(world_imp$REGION)  # characters must be factors
+set.seed(2026)
+mr <- miceRanger(world_imp,
+                 m       = 20,
+                 maxiter = 10,
+                 valueSelector       = "meanMatch",  # predictive mean matching on RF predictions
+                 meanMatchCandidates = 15,
+                 verbose = FALSE)
+```
+
+## Checks
+
+```{r}
+#| echo: true
+#| eval: false
+# Ideally, you should run these checks to assess plausibility and
+# convergence. For the latter, jaggedness is OK--trending is not.
+plotDistributions(mr, vars = c("DEMINDX22", "HDI21", "EFIDX", "GINI"))
+plotVarConvergence(mr)   # means/SDs of imputed values across iterations
+plotModelError(mr)       # OOB R^2 per variable — how well the forests predict
+plotVarImportance(mr)    # which variables drive each imputation model
+```
+
+## Model
+
+```{r}
+#| echo: true
+dat_list <- completeData(mr)
+fits <- lapply(dat_list, function(d) lm(DEMINDX22 ~ HDI21 + EFIDX + GINI, data = d))
+pooled <- pool(fits)
+summary(pooled, conf.int = TRUE)
+```
+:::
+
+## References
