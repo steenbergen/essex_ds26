@@ -1,0 +1,77 @@
+---
+title: FEEDFORWARD NEURAL NETWORKS
+subtitle: Architecture, Optimization & Regularization
+author:
+  - name: Marco R. Steenbergen
+    orcid: 0000-0002-5709-5165
+    email: steenbergen@ipz.uzh.ch
+    affiliations: University of Zurich
+date: last-modified
+format:
+  clean-revealjs:
+    revealjs-plugins:
+      - tabset
+    pdf-separate-fragments: true
+bibliography: /Users/prior/Resources/References/master.bib
+self-contained: true
+embed-resources: true
+editor_options: 
+  chunk_output_type: console
+---
+
+# Introduction {background-color="#40666e"}
+
+## The Big Picture: Why Neural Networks?
+
+::::: columns
+::: {.column width="50%"}
+### Linear Models
+
+- Draw straight lines/hyperplanes.
+- Work well for simple structured data.
+- **Fail** when decision boundaries require complex curves or non-linear combinations.
+:::
+
+::: {.column width="50%"}
+### Neural Networks
+
+- Compose multiple non-linear layers.
+- Learn intermediate **hidden representations**.
+- Warp feature space so complex boundaries become linearly separable.
+:::
+:::::
+
+## Interactive Intuition: Non-Linear Spaces
+
+Tools like the [TensorFlow Playground](https://playground.tensorflow.org) illustrate how networks learn complex distributions (e.g., spirals or concentric circles).
+
+## What Happens in the Neural Network?
+
+:::::: columns
+::: {.column width="65%"}
+- **Input features (**$x_1, x_2$): Raw coordinates.
+- **Hidden Layers:** Extract edges, curves, and regions---[**representations**]{.alert}.
+- **Output:** Combines region detectors into a unified boundary.
+:::
+
+:::: {.column width="35%"}
+::: callout-important
+## Key Insight
+
+Single neurons draw straight boundaries; stacked hidden layers curve and shape them.
+:::
+::::
+::::::
+
+## Key Developments in the Evolution of Neural Networks
+
+- 1943: Biological Neuron Model [@mcculloch1943Logical].
+- 1958: Perceptron [@rosenblatt1958Perceptron].
+- 1982: First Recurrent Network [@hopfield1982Neural].
+- 1986: Back-propagation Algorithm [@rummelhart1986Learning].
+- 1989A: Universal Approximation Theorem [@cybenko1989Approximation; @hornik1989Multilayer].
+- 1989B: First Convolutional Neural Network [@lecun1998GradientBased].
+- 2010: RELU activation function [@nair2010Rectified].
+- 2017: Transformers [@vaswani2017Attention].
+
+## References
