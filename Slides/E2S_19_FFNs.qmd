@@ -304,4 +304,12 @@ graph TD
 :::
 :::::
 
+## How Dropout Prevents Over-fitting
+
+- **Prevents Co-adaptation:** Neurons cannot rely on specific neighboring nodes being present, forcing each neuron to learn robust, independent features.
+
+- **Implicit Ensemble:** Training with dropout is equivalent to averaging predictions across an ensemble of $2^N$ smaller sub-networks.
+
+- **Inference / Testing:** Dropout is turned **off** during testing, and weights are scaled by $(1 - p)$ to match training expectations.
+
 ## References
