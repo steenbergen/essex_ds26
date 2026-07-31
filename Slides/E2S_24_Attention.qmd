@@ -1,0 +1,720 @@
+---
+title: ATTENTION IS ALL YOU NEED
+subtitle: A Foray Into Transformers
+author:
+  - name: Marco R. Steenbergen
+    orcid: 0000-0002-5709-5165
+    email: steenbergen@ipz.uzh.ch
+    affiliations: University of Zurich
+date: last-modified
+format:
+  clean-revealjs:
+    revealjs-plugins:
+      - tabset
+    pdf-separate-fragments: true
+    mermaid-format: svg
+bibliography: /Users/prior/Resources/References/master.bib
+self-contained: true
+embed-resources: true
+---
+
+# Word Embeddings {background-color="#40666e"}
+
+## Why Numbers?
+
+- Machine learning algorithms expect **numeric inputs**, but words are symbols that carry no inherent numeric value.
+
+- Before we can model text, we must convert words into numbers.
+
+- The catch: we want a conversion that **preserves meaning**, so that words used in similar ways end up with similar numbers.
+
+- The result of such a conversion is called an [**embedding**]{.alert}.
+
+## The Naive Fix Fails
+
+- Why not just assign each word an integer (e.g., "cat" = 1, "dog" = 2, ...)?
+
+  - This invents an ordering that does not exist and implies "cat" $<$ "dog".
+
+- Why not use **one-hot vectors** — a 1 in the word's slot and 0 everywhere else?
+
+  - No false ordering, but the vectors are huge, sparse, and mutually **orthogonal**.
+
+  - Every pair of words is then equally dissimilar: all meaning is lost.
+
+- We want **dense, low-dimensional** vectors in which similar words sit close together $\rightarrow$ *learned* embeddings.
+
+## The Intuition
+
+- Imagine two phrases:
+
+  1.  "Barbie is great."
+
+  2.  "Oppenheimer is great."
+
+- Let us use a word to **predict the next word** in the sentence.
+
+  - The weight assigned to a word becomes its embedding.
+
+  - We choose the weights so that prediction is optimized.
+
+- Words can have multiple meanings:
+
+  - "great" could mean *wonderful*.
+
+  - It could also be sarcastic, as in "Great, now it started raining."
+
+- Words with similar meanings should receive similar numerical values.
+
+## The Approach
+
+- Inputs are unique words that can be **active** (1) if they are our focus or **inactive** (0) if they are not.
+
+- We add as many hidden nodes as we want embedding dimensions.
+
+- We then use the embeddings to predict the next word. For instance:
+
+  - Input: Oppenheimer = 1
+
+  - Target: is
+
+- The weights associated with each input word **are** the embeddings.
+
+- There are no biases.
+
+## Architecture
+
+![](Images/emb_architecture.png){fig-align="center" width="950"}
+
+## A Worked Example
+
+- Imagine $w_{11} = 0.5$ and $w_{21} = -0.1$. When Barbie = 1, then $H_1 = 0.5$ and $H_2 = -0.1$.
+
+- Imagine the connections from $H_1$ to the softmax layer are $0.1, 0.2, 0.5, 0.2$.
+
+- Imagine the connections from $H_2$ to the softmax layer are $0.2, -0.2, 0.2, -0.3$.
+
+- Then:
+
+  - $P(\text{Barbie}) = 0.226$
+
+  - $P(\text{Oppenheimer}) = 0.248$
+
+  - $\mathbf{P(\text{Is}) = 0.276}$
+
+  - $P(\text{Great}) = 0.250$
+
+## Final Embeddings
+
+::::: columns
+::: {.column width="45%"}
+| Word        | $H_1$ | $H_2$ |
+|-------------|------:|------:|
+| Barbie      |  2.02 |  1.98 |
+| Oppenheimer |  1.73 |  1.99 |
+| Is          | -2.17 |  2.48 |
+| Great       | -2.13 | -2.23 |
+:::
+
+::: {.column width="55%"}
+![](Images/emb_scatter.png){fig-align="center" width="520"}
+
+Barbie and Oppenheimer (top right) sit close together; "Is" and "Great" end up far away.
+:::
+:::::
+
+## Measuring Similarity
+
+::::: columns
+::: {.column width="45%"}
+![](Images/emb_cosine.png){fig-align="center" width="480"}
+:::
+
+::: {.column width="55%"}
+- Semantic similarity in the latent space is measured using [**cosine similarity**]{.alert}.
+
+- For example, the cosine similarity between "Barbie" and "Great" is roughly $\cos 180^\circ = -1$.
+
+- It always lies between $-1$ and $1$, and is computed as
+
+  $$\cos \alpha = \frac{\boldsymbol{a} \cdot \boldsymbol{b}}{\|\boldsymbol{a}\|\,\|\boldsymbol{b}\|}$$
+
+- **Foreshadowing:** this dot product between vectors is exactly the machinery that will drive *attention* later on.
+:::
+:::::
+
+## In Reality ...
+
+- We train on vastly more sentences, e.g., all of Wikipedia.
+
+- We include many more hidden nodes (e.g., 100).
+
+- Moreover, we take more context into account.
+
+# Word2Vec {background-color="#40666e"}
+
+## Adding Context
+
+- Word2Vec [@mikolov2013Efficient] adds more context to the embeddings.
+
+- Word2Vec, for instance, uses
+
+  - **Continuous bag of words** (CBOW) — use the surrounding words and predict what is in the middle.
+
+  - **Skip-gram** — use the word in the middle to predict the surrounding words.
+
+## Two Architectures
+
+![](Images/emb_word2vec_arch.png){fig-align="center" width="900"}
+
+## Estimation Demands
+
+- Word2Vec might have access to about 3 million words and phrases.
+
+- With 100 hidden nodes, this could result in as many as 600 million weights!
+
+- Of course, only one word will be set to 1 (unless one uses a continuous bag of words), so that eliminates close to 300 million weights going out from the words on the left side of the model.
+
+- Still, the demands seem staggering.
+
+## Sampling Strategies
+
+::::: columns
+::: {.column width="50%"}
+### Subsampling
+
+- Imagine the word pair (the, woman).
+
+- How much information does the article "the" provide about "woman"? It is used with so many words that the answer is very little.
+
+- Maybe we should not sample "the" very often at all $\rightarrow$ subsampling.
+
+- We sample words less the more frequently they occur, ensuring their probability is not exactly 0.
+:::
+
+::: {.column width="50%"}
+### Negative Sampling
+
+- Each training sample updates only a small percentage of the weights.
+
+- We do this by dropping a large fraction of the target words.
+
+- In (evil, woman) only "woman" is set to 1 — the target. All other potential targets are set to 0.
+
+- We randomly select just a small fraction (2–20) of those negative words during training.
+:::
+:::::
+
+# GloVe {background-color="#40666e"}
+
+## Global Vectors
+
+- GloVe = global vectors for word representation [@pennington2014Glove].
+
+- It expands on Word2Vec by taking even more of the context into consideration.
+
+- Its building block is the [**count matrix**]{.alert}, which captures how often words co-occur.
+
+## The Count Matrix
+
+::::: columns
+::: {.column width="35%"}
+- I favor equality.
+
+- I favor gay marriage.
+
+Window = 1
+:::
+
+::: {.column width="65%"}
+|          |  I  | Favor | Equality | Gay | Marriage |  .  |
+|----------|:---:|:-----:|:--------:|:---:|:--------:|:---:|
+| I        |  0  |   2   |    0     |  0  |    0     |  0  |
+| Favor    |  2  |   0   |    1     |  1  |    0     |  0  |
+| Equality |  0  |   1   |    0     |  0  |    0     |  1  |
+| Gay      |  0  |   1   |    0     |  0  |    1     |  0  |
+| Marriage |  0  |   1   |    0     |  1  |    0     |  1  |
+| .        |  0  |   0   |    1     |  0  |    1     |  0  |
+:::
+:::::
+
+## Notation
+
+- $x_{ij}$ = the number of times word $j$ occurs in the context of word $i$.
+
+- $x_{j \mid i}$ = the number of times word $j$ occurs given that word $i$ occurred as well.
+
+## The Crux
+
+::::: columns
+::: {.column width="55%"}
+| Prob & Ratio      | $k =$ Solid | $k =$ Gas | $k =$ Water | $k =$ Fashion |
+|-------------------|:-----------:|:---------:|:-----------:|:-------------:|
+| $P(k \mid ice)$   |    High     |    Low    |    High     |      Low      |
+| $P(k \mid steam)$ |     Low     |   High    |    High     |      Low      |
+| Ratio             |    $> 1$    |   $< 1$   | $\approx 1$ |  $\approx 1$  |
+:::
+
+::: {.column width="45%"}
+- We focus on the ratio
+
+  $$\frac{P(k \mid i)}{P(k \mid j)}$$
+
+- Here $k$ is a context word.
+
+- Two related words have a much higher conditional probability than two unrelated words.
+:::
+:::::
+
+## Loss Function
+
+::::: columns
+::: {.column width="45%"}
+- We set a linear function with weights and biases that optimize the log-frequency of words.
+
+- We add a weight $f(x_{ij})$ that limits the impact of very frequent co-occurrences.
+
+- The weights become the embeddings.
+:::
+
+::: {.column width="55%"}
+
+$$\text{Loss} = \sum_{i,j} f(x_{ij}) \left( \boldsymbol{w}_i^\top \boldsymbol{w}_j + b_i + b_j - \ln(x_{ij}) \right)^2$$
+:::
+:::::
+
+# Motivation {background-color="#40666e"}
+
+## Rich Embeddings
+
+- We have just seen how Word2Vec and GloVe generate embeddings by considering the context of a target word.
+
+- But two limitations remain:
+
+  - Each word receives a *single, static* vector — "great" has one embedding whether it means *wonderful* or *sarcastic*.
+
+  - The context is still limited to a few surrounding words.
+
+- What if we could take in a lot more context, e.g., all of a speech, law, or novel — and let a word's vector *change* with that context?
+
+## A Long Journey with a Happy End
+
+- It turns out that bringing in context is not easy, especially not when we try to use distal tokens to predict what is now.
+
+- Early efforts included
+
+  - Recurrent neural networks.
+
+  - Long short term memory.
+
+- Neither performed very well.
+
+- Finally, @vaswani2017Attention developed an elegant solution that has become the backbone of modern-day [**transformers**]{.alert} such as BERT.
+
+# Recurrent Neural Networks {background-color="#40666e"}
+
+## Mimicking Autoregressive Time Series
+
+- Consider the following sentence:
+
+  > The shrewd politician struck a major deal with her opponents.
+
+- We want to take into account how the first word continues to affect the last one.
+
+- We could mimic an AR(1) process:
+
+  - "The" $\rightarrow$ "shrewd" $\rightarrow$ "politician" $\rightarrow \cdots \rightarrow$ "her" $\rightarrow$ "opponents"
+
+- OK, but we want to build this into a neural network to get embeddings.
+
+## We Have a Tool
+
+- Might this not be an excellent candidate for a [**recurrent neural network**]{.alert} or RNN [@elman1990Finding]?
+- RNNs contain feedback loops have **memory** on the hidden states, which is exactly what we need.
+- They were developed for sequential data such as text or audio.
+
+## What Does RNN Look Like?
+
+![](images/RNN.png){fig-align="center" width="750"}
+
+**Source:** @goodfellow2016Deep, 373.
+
+## How Does That Help with Text?
+
+| t | Word | Input | Hidden State |
+|------------------|------------------|------------------|------------------|
+| 1 | The | $x_1 = \text{Embed}(The)$ | $h_1 = f(x_1, h_0)$ |
+| 2 | shrewd | $x_2 = \text{Embed}(shrewd)$ | $h_2 = f(x_2, h_1)$ |
+| 3 | politician | $x_3 = \text{Embed}(politician)$ | $h_3 = f(x_3,h_2)$ |
+| $\cdots$ | $\cdots$ | $\cdots$ | $\cdots$ |
+| 11 | opponents | $x_{11} = \text{Embed}(opponents)$ | $h_{11} = f(x_{11}, h_{10})$ |
+
+In theory, the word "The" is carried forward because it flows into $h_1$, which flows into $h_2$, etc. The same holds true for later words and their subsequent effects.
+
+## Numeric Example
+
+::: panel-tabset
+## Setup
+
+Imagine a tiny RNN with
+
+- 2D word embeddings
+
+- 2D hidden states
+
+- No bias
+
+- A $\tanh$ activation
+
+## Setup Cont'd
+
+- Let $x_1^\top = [1,0]$ and $x_2^\top = [0,1]$ for illustrating the first two words.
+
+- Assume $h_0^\top = [0,0]$.
+
+- Let
+
+  $$W_x = \begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \ \text{and} \ W_h = \begin{bmatrix} 0.5 & 0 \\ 0 & 0.5 \end{bmatrix}$$
+
+- We update using $h_t = \tanh(W_x x_t + W_h h_{t-1})$.
+
+## Step 1
+
+$$h_1 = \tanh \left( \begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \begin{bmatrix} 1 \\ 0 \end{bmatrix} + \begin{bmatrix} 0.5 & 0 \\ 0 & 0.5 \end{bmatrix} \begin{bmatrix} 0 \\ 0 \end{bmatrix} \right) \approx \begin{bmatrix} 0.76 \\ 0.76 \end{bmatrix}$$
+
+## Step 2
+
+$$h_2 = \tanh \left( \begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \begin{bmatrix} 0 \\ 1 \end{bmatrix} + \begin{bmatrix} 0.5 & 0 \\ 0 & 0.5 \end{bmatrix} \begin{bmatrix} 0.76 \\ 0.76 \end{bmatrix} \right) \approx \begin{bmatrix} 0.88 \\ -0.55 \end{bmatrix}$$
+
+## Interpretation
+
+| Step | Word | Hidden State | Meaning |
+|------------------|------------------|------------------|------------------|
+| 0 | START | 
+$$\begin{bmatrix} 0 \\ 0 \end{bmatrix}$$ | No context yet. |
+| 1 | "The" | 
+$$\begin{bmatrix} 0.76 \\ 0.76
+\end{bmatrix}$$ | Encodes info about "The." |
+| 2 | "shrewd" | 
+$$\begin{bmatrix}  0.88 \\ -0.55 \end{bmatrix}$$ | Reflects both "The" and "shrewd" in compressed form. |
+:::
+
+## Trouble in Paradise
+
+- @hochreiter1991Untersuchungen documented the problem of [**vanishing gradients**]{.alert} in RNNs.
+- That is, the gradients become vanishingly smallas we engage in backpropagation through time.
+- This has two downsides:
+  1.  Backpropagation frequently fails.
+  2.  Even if it succeeds, it is not clear how much the distal past still matters for the current word (memory loss).
+
+## Why Vanishing Gradients Happen
+
+- For simplicity, let $h_t = W_h h_{t-1}$.
+
+- We define a loss function $L = \ell(h_T)$.
+
+- We seek to update the weights and for that we need
+
+  $$\frac{\partial L}{\partial W_h} = \sum_{t=1}^T \frac{\partial L}{\partial h_t} \cdot \frac{\partial h_t}{\partial W_h}$$
+
+- However $\partial h_t/\partial W_h = h_{t-1}^\top \otimes I$.
+
+- Consequently, $\partial L/\partial W_h = \sum_{t=1}^T \left( \frac{\partial L}{\partial h_T} \cdot W_h^{T-t} \right) h_{t-1}^\top$.
+
+- If $||W_h|| < 1$ then $\lim_{T-t \rightarrow \infty} W_h^{T-t} = 0$.
+
+- The model cannot learn from earlier inputs.
+
+## LSTM to the Rescue
+
+- @hochreiter1997Long built an algorithm that seeks to bypass these problems: long short term memory.
+
+- This remembers information over long time spans.
+
+- It avoids vanishing gradients through several mechanisms:
+
+  - Cell states act like memory conveyor belts—information can flow through many time steps with minimal modification.
+
+  - Gates (input, forget, output) control what information is added, keptm or removed from the memory.
+
+  - The update mechanism is additive rather than multiplicative.
+
+## But It Is Not Enough
+
+- Works well for moderate-length sequences (50-100 tokens).
+
+- Long documents (500+ tokens) still yield problems because memory cells still get overwritten.
+
+- Perhaps following a sequential logic is not good enough.
+
+# Attention Is All You Need {background-color="#40666e"}
+
+## Vaswani et al.'s Breakthrough
+
+::::: columns
+::: {.column width="40%"}
+![](images/vaswani.png){fig-align="left"}
+:::
+
+::: {.column width="60%"}
+- @vaswani2017Attention tell us to forget about sequence.
+
+- Let each token *attend* to any other token regardless of position.
+
+- Use this attention to update a set of embeddings.
+
+- One can even run many of these attention mechanisms in parallel $\rightarrow$ multi-head attention.
+:::
+:::::
+
+## The Intuition
+
+- Every token starts with an initial embedding.
+
+  - E.g., "house" will be represented in the embedding space near "villa," "home," etc.
+
+- We update that embedding based on the context of the word.
+
+  - E.g., "little house" might change the embedding of "house," moving it perhaps away from "villa."
+
+  - E.g., "little house on the prairie" will change the embedding even more because "house" now is part of the title of a 1970s American TV series.
+
+## The Initial Embedding Space
+
+We start with a high-dimensional vector containing the embeddings of each token. For instance,
+
+$$\begin{array}{ccccc}
+\text{The} & \text{shrewd} & \text{politician} & \cdots & \text{opponents} \\
+\downarrow & \downarrow & \downarrow & & \downarrow \\
+E_1 & E_2 & E_3 & \cdots & E_{10}
+\end{array}$$
+
+Here, $E$ may have 1024 elements, as in BERT large.
+
+## The Key Formula
+
+@vaswani2017Attention proposed that the updates to the embeddings are given by
+
+> 
+> $$\text{Attention}(Q,K,V) = \text{softmax} \left( \frac{K^\top Q}{\sqrt{d}} \right) V$$
+
+## Example of Attention
+
+- Imagine we are interested in the way in which adjectives alter the meaning of words.
+
+- In the sentence, "The shrewd politician struck a major deal with her opponents," this amounts to asking
+
+  - How does "shrewd" affect the meaning of "politician."
+
+  - How does "major" affect the meaning of "deal."
+
+- **Important:** In reality we do not have that much control over what attention heads do; it is just to show the logic.
+
+## The Query
+
+- Imagine the noun "politician" asking whether any adjectives are placed in front of it.
+
+- We would expect "shrewd" to answer "yes."
+
+- The question is encoded as the **query**.
+
+  - This is another vector but its dimensionality is less than that of the original embeddings!
+
+- We compute the query as a matrix-vector product. For "politician," which is in position 3, this becomes $W_Q E_3 = Q_3$.
+
+  - Here $W_Q$ is a matrix of trainable weights
+
+- We do this for all tokens simultaneously. For the $i$th token,
+
+  $$Q_i = W_Q E_i$$
+
+## The Keys
+
+- We also encode the answers to the queries; they become the **keys**.
+
+- So for instance, "shrewd" also is transformed using $W_K E_2 = K_2$.
+
+  - Here $W_K$ is another trainable weight matrix.
+
+- As before, the process occurs simultaneously for all embeddings. Hence,
+
+  $$K_j = W_K E_j$$
+
+## Bringing Keys and Queries Together
+
+- So how well does each key speak to a query?
+
+- The mathematical vehicle for answering that question is the dot product
+
+  $$K_j Q_i$$
+
+- Its value indicates how relevant the key is to the query.
+
+- For instance, if "politician" asked which adjective comes before me, then we would expect $K_2 Q_3$ to be particularly large.
+
+- We say: the embedding of "shrewd" attends to the embedding of "politician."
+
+## Bring Keys and Queries Together Cont'd
+
+$$\begin{bmatrix}
+& \text{The} & \text{shrew} & \text{politician} & \cdots & \text{opposition} \\
+\text{The} & K_1 Q_1 & K_1Q_2 & K_1Q_3 & \cdots & K_1Q_{10} \\
+\text{shrewd} & K_2 Q1 & K_2 Q_2 & K_2 Q_3 & \cdots & K_2 Q_{10} \\
+\text{politician} & K_3 Q_1 & K_3 Q_2 & K_3 Q_3 & \cdots & K_3 Q_{10} \\
+\vdots & \vdots & \vdots & \vdots & \ddots & \vdots \\
+\text{opposition} & K_{10} Q_1 & K_{10} Q_2 & K_{10} Q_3 & \cdots & K_{10} Q_{10}
+\end{bmatrix}$$
+
+@vaswani2017Attention write $K^\top Q$ for this key-query matrix.
+
+## The Softmax Function
+
+- In each column, we have a series of values that show the relevance of each key for the token in the column
+
+- At the moment these are real numbers that @vaswani2017Attention divide by the square root of the dimensionality (number of rows), $d$, of the key-query space.
+
+- But would not it be nice to render these numbers as probabilities that add to 1 in each column?
+
+- This is done through the softmax function, which is applied for each column.
+
+- The resulting space is called the **attention pattern**.
+
+  - Tells us with context words contribute to the representation of the target word.
+
+## Almost There
+
+- With $N$ tokens, the attention pattern is a $N \times N$ matrix, at least if we allow each word to speak to each other word.
+
+- The original embedding space, had a different dimensionality, e.g., $1024 \times N$.
+
+- To update the embeddings we need to transform the attention pattern to be conformable with the attention space.
+
+- This is where $V$ (values) come into the picture
+
+  - Also trained.
+
+  - Multiplied by the weights and summed.
+
+  - Give the adjustments to the embeddings.
+
+- The final embedding is the original embedding plus the adjustment.
+
+- We have transformed the embedding $\rightarrow$ a **transformer** was born.
+
+# Attention Is Not All You Need After All {background-color="#40666e"}
+
+## Almost There and Yet So Far Away
+
+- We got rid off sequence, but does it not still matter? Do not words come in a particular order?
+
+- Transformers process tokens in parallel.
+
+- This is faster, but we lose positional information that is highly relevant.
+
+- We need to add **positional encoding** to make this work.
+
+## The Problem
+
+- You might think positional encoding is as simple as assigning integers such as 0 for "The", 1 for "shrewd," etc.
+
+- But neural networks do not know what to do with this:
+
+  - No generalization across different sequence lengths.
+
+  - No sense of ordinality.
+
+  - Relatedly, the integers do not preserve relative or global structure because they may undergo linear transformations.
+
+- Moreover, we may want positional encodings to be sensitive to different rythms:
+
+  - Slow—capturing coarse distances such as beginning versus end.
+
+  - Fast—capturing fine distances such as token versus token.
+
+## Positional Encoding Done Right
+
+- @vaswani2017Attention proposed
+
+  $$\begin{array}{lcl}
+  \text{PE}_{\text{pos},2i} &=& \sin \left( \frac{\text{pos}}{10000^{\frac{2i}{d_m}}} \right) \\
+  \text{PE}_{\text{pos},2i + 1} &=& \cos \left( \frac{\text{pos}}{10000^{\frac{2i}{d_m}}} \right)
+  \end{array}$$
+
+- We settle on a number of positional encodings, $d_m$, where $m$ is the model.
+
+- We take positional information (integers) $\text{pos}$.
+
+- $i$ is a frequency index.
+
+- If the dimension is even, then the sine-formula is used; otherwise the cosine-formula.
+
+## Illustration
+
+- The word "politician" occurs in $\text{pos} = 3$.
+
+- Imagine, $d_m = 6$; we opt for two positional encodings.
+
+- Then $i = 0, 1, 2$ because each $i$ produces 2 dimensions, even and odd.
+
+- So $i = 0$ produces
+
+  $$\begin{array}{lcl}
+  \sin \left( \frac{3}{10000^{\frac{0}{6}}} \right) &=& \sin(3) \\
+  \cos \left( \frac{3}{10000^{\frac{0}{6}}} \right) &=& \cos(3)
+  \end{array}$$
+
+## Determinism versus Learning
+
+- @vaswani2017Attention opted for fixed positional encodings.
+
+- Later algorithms like BERT have turned this into a training problem $\rightarrow$ typically better performance.
+
+# Encoders and Decoders {background-color="#40666e"}
+
+## The Full Architecture
+
+![](images/decoder_encoder.png){fig-align="center" width="700"}
+
+**Source:** @vaswani2017Attention, 3. The encoder is shown on the left; the decoder on the right. The latter was used for a translation task.
+
+## Encoder-Decoder Logic
+
+- Encoders make sense of text $\rightarrow$ embeddings and positional encodings:
+
+  - The encoder turns an input sequence of tokens (e.g., a sentence) into a sequence of contextualized vectors—one per token—that carry rich semantic and positional information.
+
+- Decoders use this information to answer specific questions like:
+
+  - Who was Julius Caesar?
+
+  - How do I translate "I hate spinach" into French?
+
+  - What is the derivative of $\ln(x^2)$?
+
+  - What is the Python code for a CNN?
+
+## Multi-Head Attention
+
+- @vaswani2017Attention employed multi-head attention:
+
+  - Instead of generating one attention pattern, we generate many.
+
+- Multi-head attention allows the model to learn **diverse relationships in parallel**, just like CNNs use **multiple filters** to detect features.
+
+- This is a standard feature of transformers.
+
+## What Is Going on in the Encoder?
+
+1.  Input embeddings (a.k.a. static embeddings) are fed from an embedding table.
+2.  Positional encodings are generated.
+3.  The encoder block processes the input embeddings and positional encodings and is repeated $N$ times.
+4.  Output embeddings are generated.
+
+## The Encoder Block
+
+1.  Multi-head attention mechanisms run in parallel and allow for specialization.
+2.  We add the input vector to the attention output (residual connection) to obtain updated embeddings and then norm for stabilization.
+3.  A small multi-layer perceptron is applied independently to each token's vector, allowing the model to mix and transform the features learned from attention.
+4.  A residual connection and normalization are once more applied.
+
+## References

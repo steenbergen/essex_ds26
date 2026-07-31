@@ -465,4 +465,12 @@ round(sc$scores, 2)
 ```
 :::
 
+## Exercise
+
+::: callout-tip
+## Your Turn
+
+Perform a PCA on the predictive features from the Boston Housing data. How many components would you retain? What do they mean?
+:::
+
 ## References
